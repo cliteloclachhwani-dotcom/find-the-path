@@ -1,42 +1,32 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Railway Audit Tool v3.0 Final</title>
+    <title>SECR MONITOR</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; display: flex; font-family: 'Segoe UI', Arial, sans-serif; height: 100vh; background: #f4f4f4; }
-        #sidebar { width: 330px; background: #2c3e50; color: white; padding: 20px; z-index: 1000; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
+        body { margin: 0; display: flex; font-family: sans-serif; height: 100vh; background: #eef2f3; }
+        #sidebar { width: 320px; background: #ffffff; color: #333; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); overflow-y: auto; }
         #map { flex: 1; position: relative; }
-        .stats-box { background: rgba(0,0,0,0.85); color: #00ff00; padding: 12px; border-radius: 6px; position: absolute; top: 15px; right: 15px; z-index: 1000; font-family: 'Courier New', monospace; border: 1px solid #555; line-height: 1.5; }
-        select, input, button { width: 100%; margin-bottom: 15px; padding: 12px; border-radius: 4px; border: none; box-sizing: border-box; }
-        button { background: #e67e22; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #d35400; }
-        .stn-text { color: black; font-weight: 900; font-size: 14px; text-transform: uppercase; text-shadow: 2px 2px white; white-space: nowrap; }
+        .stats-box { background: white; color: #333; padding: 10px; border-radius: 4px; position: absolute; top: 10px; right: 10px; z-index: 1000; font-family: monospace; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        select, input, button { width: 100%; margin-bottom: 12px; padding: 10px; border-radius: 4px; border: 1px solid #ccc; }
+        button { background: #34495e; color: white; cursor: pointer; font-weight: bold; border: none; }
+        button:hover { background: #2c3e50; }
+        h2 { color: #2c3e50; font-size: 18px; border-bottom: 2px solid #34495e; padding-bottom: 5px; }
     </style>
 </head>
 <body>
     <div id="sidebar">
-        <h2 style="color: #e67e22; border-bottom: 2px solid #34495e; padding-bottom: 10px;">Audit Control</h2>
-        <label>RTIS Data (CSV):</label>
+        <h2>SECR RAIPUR TELOC CELL MONITOR</h2>
         <input type="file" id="csv_file" accept=".csv">
-        <label>From Station:</label>
-        <select id="s_from"></select>
-        <label>To Station:</label>
-        <select id="s_to"></select>
-        <button onclick="generateLiveMap()">1. GENERATE FULL MAP</button>
-        <hr style="border: 0; border-top: 1px solid #444; margin: 20px 0;">
-        <button style="background: #27ae60;" onclick="saveInteractiveWebReport()">2. SAVE WEB REPORT</button>
-        <button style="background: #2980b9;" onclick="downloadExcelAudit()">3. DOWNLOAD EXCEL</button>
-        <div id="log" style="font-size: 12px; color: #bdc3c7; margin-top: 10px;"></div>
+        <label>From:</label><select id="s_from"></select>
+        <label>To:</label><select id="s_to"></select>
+        <button onclick="generateLiveMap()">GENERATE MAP</button>
+        <button style="background: #27ae60;" onclick="saveInteractiveWebReport()">WEB REPORT</button>
+        <button style="background: #2980b9;" onclick="downloadExcelAudit()">EXCEL DOWNLOAD</button>
     </div>
     <div id="map">
-        <div class="stats-box">
-            <b>LIVE MONITOR</b><br>
-            SPEED: <span id="live-speed">0.0</span> Kmph<br>
-            TIME: <span id="live-time">--:--:--</span>
-        </div>
+        <div class="stats-box">SPEED: <span id="live-speed">0.0</span> | TIME: <span id="live-time">--</span></div>
     </div>
-
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="mapping.js"></script>
