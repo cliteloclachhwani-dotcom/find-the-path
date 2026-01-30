@@ -3,7 +3,7 @@ window.rtis = [];
 const map = L.map('map').setView([21.15, 79.12], 11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// FULL 16 DN SEQUENCES
+// FULL 16 DN SEQUENCES - No Shortcuts
 const DN_SEQUENCES = [
     ["DURG","DLBS","BQR","BIA","DBEC","DCBIN","ACBIN","KMI","SZB","R","URK","MDH","SLH","BKTHW","BKTHE","TLD","HN","HNEOC","BYT","NPI","DGS","BYL","DPH","BSP"],
     ["TLD MGMT SDG","TLD","HN"],
@@ -24,25 +24,43 @@ const DN_SEQUENCES = [
 ];
 const SPECIAL_UP = [["RSD","URKW","R","SZB"], ["RSD","R","SZB"]];
 
-function conv(v) { if(!v) return null; let n = parseFloat(v.toString().replace(/[^0-9.]/g, '')); return Math.floor(n/100) + ((n%100)/60); }
-function getVal(row, keys) { if(!row) return null; let foundKey = Object.keys(row).find(k => keys.some(key => k.trim().toLowerCase() === key.toLowerCase().trim())); return foundKey ? row[foundKey] : null; }
+function conv(v) { 
+    if(!v) return null; 
+    let n = parseFloat(v.toString().replace(/[^0-9.]/g, '')); 
+    return Math.floor(n/100) + ((n%100)/60); 
+}
+
+function getVal(row, keys) { 
+    if(!row) return null; 
+    let foundKey = Object.keys(row).find(k => keys.some(key => k.trim().toLowerCase() === key.toLowerCase().trim())); 
+    return foundKey ? row[foundKey] : null; 
+}
 
 function determineDirection(from, to) {
     for(let seq of SPECIAL_UP) if(seq.includes(from) && seq.includes(to) && seq.indexOf(from) < seq.indexOf(to)) return "UP";
     for(let seq of DN_SEQUENCES) if(seq.includes(from) && seq.includes(to)) return seq.indexOf(from) < seq.indexOf(to) ? "DN" : "UP";
-    let sF = window.master.stns.find(s => getVal(s,['Station_Name']) === from), sT = window.master.stns.find(s => getVal(s,['Station_Name']) === to);
-    if(sF && sT) return conv(getVal(sT,['Start_Lng'])) > conv(getVal(sF,['Start_Lng'])) ? "DN" : "UP";
-    return "DN";
+    return "DN"; 
 }
 
 function getStationArea(stnName) {
-    let homes = window.master.sigs.filter(s => (getVal(s,['SIGNAL_NAME'])||"").includes(stnName) && (getVal(s,['SIGNAL_NAME'])||"").includes("HOME"));
+    // Search all signals for this station's HOME signals to define boundary
+    let homes = window.master.sigs.filter(s => {
+        let name = (getVal(s, ['SIGNAL_NAME']) || "").toUpperCase();
+        return name.includes(stnName.toUpperCase()) && name.includes("HOME");
+    });
+
     if (homes.length > 0) {
-        let lats = homes.map(s => conv(getVal(s,['Lat']))), lngs = homes.map(s => conv(getVal(s,['Lng'])));
-        let center = [(Math.min(...lats)+Math.max(...lats))/2, (Math.min(...lngs)+Math.max(...lngs))/2];
-        let maxDist = Math.max(...homes.map(s => Math.sqrt(Math.pow(conv(getVal(s,['Lat']))-center[0],2)+Math.pow(conv(getVal(s,['Lng']))-center[1],2))*111000));
-        return { lat: center[0], lng: center[1], radius: maxDist + 200 };
+        let lats = homes.map(s => conv(getVal(s,['Lat'])));
+        let lngs = homes.map(s => conv(getVal(s,['Lng'])));
+        let center = [(Math.min(...lats) + Math.max(...lats)) / 2, (Math.min(...lngs) + Math.max(...lngs)) / 2];
+        let maxDist = 0;
+        homes.forEach(s => {
+            let d = Math.sqrt(Math.pow(conv(getVal(s,['Lat']))-center[0], 2) + Math.pow(conv(getVal(s,['Lng']))-center[1], 2)) * 111000;
+            if (d > maxDist) maxDist = d;
+        });
+        return { lat: center[0], lng: center[1], radius: maxDist + 250 };
     }
+    // Fallback to station.csv coordinates
     let s = window.master.stns.find(x => getVal(x,['Station_Name']) === stnName);
     return s ? { lat: conv(getVal(s,['Start_Lat '])), lng: conv(getVal(s,['Start_Lng'])), radius: 800 } : null;
 }
@@ -58,51 +76,57 @@ window.onload = function() {
 };
 
 function generateLiveMap() {
-    const f = document.getElementById('csv_file').files[0];
-    const stnF = document.getElementById('s_from').value, stnT = document.getElementById('s_to').value;
-    if(!f) return alert("Select RTIS File");
-    const dir = determineDirection(stnF, stnT);
+    const file = document.getElementById('csv_file').files[0];
+    const stnFrom = document.getElementById('s_from').value;
+    const stnTo = document.getElementById('s_to').value;
+    if(!file) return alert("RTIS File select karein!");
+    const dir = determineDirection(stnFrom, stnTo);
 
-    Papa.parse(f, {header:true, skipEmptyLines:true, complete: function(res) {
-        let raw = res.data.map(row => ({ lt: parseFloat(getVal(row,['Latitude','Lat'])), lg: parseFloat(getVal(row,['Longitude','Lng'])), spd: parseFloat(getVal(row,['Speed','Spd']))||0, time: getVal(row,['Time','Logging Time'])||"--", raw: row })).filter(p => !isNaN(p.lt));
-        let areaF = getStationArea(stnF), areaT = getStationArea(stnT);
-        let sIdx = raw.findIndex(p => Math.sqrt(Math.pow(p.lt-areaF.lat,2)+Math.pow(p.lg-areaF.lng,2)) < 0.012);
-        let eIdx = raw.findLastIndex(p => Math.sqrt(Math.pow(p.lt-areaT.lat,2)+Math.pow(p.lg-areaT.lng,2)) < 0.012);
-        window.rtis = (sIdx!==-1 && eIdx!==-1) ? raw.slice(sIdx, eIdx+1) : raw;
+    Papa.parse(file, {header:true, skipEmptyLines:true, complete: function(res) {
+        let fullData = res.data.map(row => ({
+            lt: parseFloat(getVal(row,['Latitude','Lat'])),
+            lg: parseFloat(getVal(row,['Longitude','Lng'])),
+            spd: parseFloat(getVal(row,['Speed','Spd'])) || 0,
+            time: getVal(row,['Time','Logging Time']) || "--:--:--",
+            raw: row
+        })).filter(p => !isNaN(p.lt));
+
+        let areaF = getStationArea(stnFrom), areaT = getStationArea(stnTo);
+        let startIdx = fullData.findIndex(p => Math.sqrt(Math.pow(p.lt-areaF.lat,2)+Math.pow(p.lg-areaF.lng,2)) < 0.015);
+        let endIdx = fullData.findLastIndex(p => Math.sqrt(Math.pow(p.lt-areaT.lat,2)+Math.pow(p.lg-areaT.lng,2)) < 0.015);
+        window.rtis = (startIdx !== -1 && endIdx !== -1) ? fullData.slice(startIdx, endIdx + 1) : fullData;
 
         map.eachLayer(l => { if(l instanceof L.Circle || l instanceof L.Marker || l instanceof L.Polyline) map.removeLayer(l); });
 
-        // Plot Route Stations (Orange Circles)
+        // LOGIC: Plot ALL Stations in the RTIS path
         window.master.stns.forEach(stn => {
-            let name = getVal(stn, ['Station_Name']), sLt = conv(getVal(stn,['Start_Lat '])), sLg = conv(getVal(stn,['Start_Lng']));
+            let name = getVal(stn, ['Station_Name']);
+            let sLt = conv(getVal(stn,['Start_Lat '])), sLg = conv(getVal(stn,['Start_Lng']));
+            // Check if train passed through this station's vicinity
             if(window.rtis.some(p => Math.sqrt(Math.pow(p.lt-sLt,2)+Math.pow(p.lg-sLg,2)) < 0.015)) {
                 let a = getStationArea(name);
-                L.circle([a.lat, a.lng], {radius: a.radius, color: 'orange', fillOpacity: 0.2, weight: 2}).addTo(map);
-                L.marker([a.lat, a.lng], {icon: L.divIcon({className:'stn-label', html:`<b class="stn-text">${name}</b>`})}).addTo(map);
+                L.circle([a.lat, a.lng], {radius: a.radius, color: 'orange', fillOpacity: 0.25, weight: 2}).addTo(map);
+                L.marker([a.lat, a.lng], {icon: L.divIcon({className:'stn-label', html:`<b class="stn-text">${name} STN</b>`, iconAnchor: [50, 0]})}).addTo(map);
             }
         });
 
-        // Plot Signals with Folder Icons
+        // LOGIC: Plot Signals with PNG Icons from folder
         window.master.sigs.forEach(sig => {
             if(!sig.type.startsWith(dir)) return;
             let sLt = conv(getVal(sig,['Lat'])), sLg = conv(getVal(sig,['Lng']));
             let match = window.rtis.find(p => Math.sqrt(Math.pow(p.lt-sLt,2)+Math.pow(p.lg-sLg,2)) < 0.002);
             if(match) {
-                let icon = L.icon({ iconUrl: `master/icons/${sig.type}.png`, iconSize: [24, 24] });
-                L.marker([sLt, sLg], {icon: icon}).addTo(map).bindPopup(`<b>${getVal(sig,['SIGNAL_NAME'])}</b><br>Speed: ${match.spd} Kmph<br>Time: ${match.time}`);
+                let sigIcon = L.icon({ iconUrl: `master/icons/${sig.type}.png`, iconSize: [26, 26], iconAnchor: [13, 13] });
+                L.marker([sLt, sLg], {icon: sigIcon}).addTo(map).bindPopup(`<b>${getVal(sig,['SIGNAL_NAME'])}</b><br>Speed: ${match.spd} Kmph<br>Time: ${match.time}`);
             }
         });
 
-        // Interactive Path with Mouse Interaction
-        let poly = L.polyline(window.rtis.map(p=>[p.lt,p.lg]), {color: '#333', weight: 4}).addTo(map);
+        // INTERACTIVE PATH
+        let poly = L.polyline(window.rtis.map(p=>[p.lt,p.lg]), {color: '#333', weight: 5, opacity: 0.8}).addTo(map);
         poly.on('mousemove', (e) => {
-            let p = window.rtis.reduce((prev, curr) => Math.abs(curr.lt-e.latlng.lat) < Math.abs(prev.lt-e.latlng.lat) ? curr : prev);
-            document.getElementById('live-speed').innerText = p.spd;
-            document.getElementById('live-time').innerText = p.time;
-        });
-        poly.on('click', (e) => {
-            let p = window.rtis.reduce((prev, curr) => Math.abs(curr.lt-e.latlng.lat) < Math.abs(prev.lt-e.latlng.lat) ? curr : prev);
-            L.popup().setLatLng(e.latlng).setContent(`Spot Speed: ${p.spd} Kmph<br>Time: ${p.time}`).openOn(map);
+            let pt = window.rtis.reduce((prev, curr) => Math.abs(curr.lt-e.latlng.lat) < Math.abs(prev.lt-e.latlng.lat) ? curr : prev);
+            document.getElementById('live-speed').innerText = pt.spd.toFixed(1);
+            document.getElementById('live-time').innerText = pt.time;
         });
         map.fitBounds(poly.getBounds());
     }});
