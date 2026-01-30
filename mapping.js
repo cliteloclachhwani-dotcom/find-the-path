@@ -46,7 +46,6 @@ function generateLiveMap() {
     Papa.parse(f, {header:true, skipEmptyLines:true, complete: function(res) {
         let raw = res.data.map(r => ({ lt: parseFloat(getVal(r,['Lat','Latitude'])), lg: parseFloat(getVal(r,['Lng','Longitude'])), spd: parseFloat(getVal(r,['Spd','Speed']))||0, time: getVal(r,['Time','Logging Time'])||"-", raw: r })).filter(p => !isNaN(p.lt));
         
-        // Find Start/End based on station coordinates
         let stnStart = window.master.stns.find(x => getVal(x,['Station_Name']) === sF);
         let stnEnd = window.master.stns.find(x => getVal(x,['Station_Name']) === sT);
         let si = raw.findIndex(p => Math.sqrt(Math.pow(p.lt-conv(getVal(stnStart,['Start_Lat '])),2)+Math.pow(p.lg-conv(getVal(stnStart,['Start_Lng'])),2)) < 0.015);
@@ -55,21 +54,21 @@ function generateLiveMap() {
 
         map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Marker || l instanceof L.Polyline) map.removeLayer(l); });
 
-        // Plot Stations (No Circle, Just Label)
+        // Stations Labels Only
         window.master.stns.forEach(s => {
             let n = getVal(s,['Station_Name']), lt = conv(getVal(s,['Start_Lat '])), lg = conv(getVal(s,['Start_Lng']));
             if(window.rtis.some(p => Math.sqrt(Math.pow(p.lt-lt,2)+Math.pow(p.lg-lg,2)) < 0.012)) {
-                L.marker([lt, lg], {icon: L.divIcon({className:'', html: `<b style="color:black; font-size:12px; text-shadow:1px 1px white;">${n}</b>`})}).addTo(map);
+                L.marker([lt, lg], {icon: L.divIcon({className:'stn-label-style', html: n})}).addTo(map);
             }
         });
 
-        // Plot Signal Dots
+        // Solid Filled Signal Icons
         window.master.sigs.forEach(sig => {
             if(!sig.type.startsWith(dir)) return;
             let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
             let m = window.rtis.find(p => Math.sqrt(Math.pow(p.lt-slt,2)+Math.pow(p.lg-slg,2)) < 0.0012);
             if(m) {
-                L.circleMarker([slt, slg], {radius: 6, color: sig.clr, fillOpacity: 0.9, fillColor: 'white', weight: 2})
+                L.circleMarker([slt, slg], {radius: 7, color: 'white', weight: 1.5, fillOpacity: 1, fillColor: sig.clr})
                 .addTo(map).bindPopup(`<b>${getVal(sig,['SIGNAL_NAME'])}</b><br>Speed: ${m.spd} | Time: ${m.time}`);
             }
         });
