@@ -1,6 +1,6 @@
 window.master = { stns: [], sigs: [] };
 window.rtis = [];
-const map = L.map('map').setView([21.15, 79.12], 11);
+const map = L.map('map').setView([21.15, 79.12], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 const DN_SEQUENCES = [
@@ -27,27 +27,14 @@ function determineDirection(f, t) {
     return "DN";
 }
 
-function getStationArea(stn) {
-    let sigs = window.master.sigs.filter(s => (getVal(s,['SIGNAL_NAME'])||"").includes(stn) && (getVal(s,['SIGNAL_NAME'])||"").includes("HOME"));
-    if (sigs.length > 0) {
-        let lats = sigs.map(s => conv(getVal(s,['Lat']))), lngs = sigs.map(s => conv(getVal(s,['Lng'])));
-        let minLt = Math.min(...lats), maxLt = Math.max(...lats), minLg = Math.min(...lngs), maxLg = Math.max(...lngs);
-        let ctr = [(minLt+maxLt)/2, (minLg+maxLg)/2];
-        let rad = Math.max(...sigs.map(s => Math.sqrt(Math.pow(conv(getVal(s,['Lat']))-ctr[0],2)+Math.pow(conv(getVal(s,['Lng']))-ctr[1],2))*111000));
-        return { lat: ctr[0], lng: ctr[1], radius: rad + 250 };
-    }
-    let s = window.master.stns.find(x => getVal(x,['Station_Name']) === stn);
-    return s ? { lat: conv(getVal(s,['Start_Lat '])), lng: conv(getVal(s,['Start_Lng'])), radius: 900 } : null;
-}
-
 window.onload = function() {
     Papa.parse("master/station.csv", {download:true, header:true, complete: r => {
         window.master.stns = r.data.filter(s => getVal(s, ['Station_Name']));
         let h = window.master.stns.map(s => `<option value="${getVal(s,['Station_Name'])}">${getVal(s,['Station_Name'])}</option>`).sort().join('');
         document.getElementById('s_from').innerHTML = h; document.getElementById('s_to').innerHTML = h;
     }});
-    const files = [{f:'up_signals.csv', t:'UP'}, {f:'dn_signals.csv', t:'DN'}, {f:'up_mid_signals.csv', t:'UP_MID'}, {f:'dn_mid_signals.csv', t:'DN_MID'}];
-    files.forEach(c => { Papa.parse("master/"+c.f, {download:true, header:true, complete: r => { r.data.forEach(s => { if(getVal(s,['Lat'])){ s.type=c.t; window.master.sigs.push(s); } }); }}); });
+    const files = [{f:'up_signals.csv', t:'UP', c:'#2ecc71'}, {f:'dn_signals.csv', t:'DN', c:'#3498db'}, {f:'up_mid_signals.csv', t:'UP_MID', c:'#e74c3c'}, {f:'dn_mid_signals.csv', t:'DN_MID', c:'#9b59b6'}];
+    files.forEach(c => { Papa.parse("master/"+c.f, {download:true, header:true, complete: r => { r.data.forEach(s => { if(getVal(s,['Lat'])){ s.type=c.t; s.clr=c.c; window.master.sigs.push(s); } }); }}); });
 };
 
 function generateLiveMap() {
@@ -58,35 +45,36 @@ function generateLiveMap() {
 
     Papa.parse(f, {header:true, skipEmptyLines:true, complete: function(res) {
         let raw = res.data.map(r => ({ lt: parseFloat(getVal(r,['Lat','Latitude'])), lg: parseFloat(getVal(r,['Lng','Longitude'])), spd: parseFloat(getVal(r,['Spd','Speed']))||0, time: getVal(r,['Time','Logging Time'])||"-", raw: r })).filter(p => !isNaN(p.lt));
-        let aF = getStationArea(sF), aT = getStationArea(sT);
-        let si = raw.findIndex(p => Math.sqrt(Math.pow(p.lt-aF.lat,2)+Math.pow(p.lg-aF.lng,2)) < 0.015);
-        let ei = raw.findLastIndex(p => Math.sqrt(Math.pow(p.lt-aT.lat,2)+Math.pow(p.lg-aT.lng,2)) < 0.015);
+        
+        // Find Start/End based on station coordinates
+        let stnStart = window.master.stns.find(x => getVal(x,['Station_Name']) === sF);
+        let stnEnd = window.master.stns.find(x => getVal(x,['Station_Name']) === sT);
+        let si = raw.findIndex(p => Math.sqrt(Math.pow(p.lt-conv(getVal(stnStart,['Start_Lat '])),2)+Math.pow(p.lg-conv(getVal(stnStart,['Start_Lng'])),2)) < 0.015);
+        let ei = raw.findLastIndex(p => Math.sqrt(Math.pow(p.lt-conv(getVal(stnEnd,['Start_Lat '])),2)+Math.pow(p.lg-conv(getVal(stnEnd,['Start_Lng'])),2)) < 0.015);
         window.rtis = (si!==-1 && ei!==-1) ? raw.slice(si, ei+1) : raw;
 
-        map.eachLayer(l => { if(l instanceof L.Circle || l instanceof L.Marker || l instanceof L.Polyline) map.removeLayer(l); });
+        map.eachLayer(l => { if(l instanceof L.CircleMarker || l instanceof L.Marker || l instanceof L.Polyline) map.removeLayer(l); });
 
-        // Plot Stations
+        // Plot Stations (No Circle, Just Label)
         window.master.stns.forEach(s => {
             let n = getVal(s,['Station_Name']), lt = conv(getVal(s,['Start_Lat '])), lg = conv(getVal(s,['Start_Lng']));
-            if(window.rtis.some(p => Math.sqrt(Math.pow(p.lt-lt,2)+Math.pow(p.lg-lg,2)) < 0.018)) {
-                let area = getStationArea(n);
-                L.circle([area.lat, area.lng], {radius: area.radius, color: 'orange', fillOpacity: 0.2, weight: 2}).addTo(map);
-                L.marker([area.lat, area.lng], {icon: L.divIcon({className:'', html: `<b class="stn-text">${n}</b>`})}).addTo(map);
+            if(window.rtis.some(p => Math.sqrt(Math.pow(p.lt-lt,2)+Math.pow(p.lg-lg,2)) < 0.012)) {
+                L.marker([lt, lg], {icon: L.divIcon({className:'', html: `<b style="color:black; font-size:12px; text-shadow:1px 1px white;">${n}</b>`})}).addTo(map);
             }
         });
 
-        // Plot Signal Icons
+        // Plot Signal Dots
         window.master.sigs.forEach(sig => {
             if(!sig.type.startsWith(dir)) return;
             let slt = conv(getVal(sig,['Lat'])), slg = conv(getVal(sig,['Lng']));
-            let m = window.rtis.find(p => Math.sqrt(Math.pow(p.lt-slt,2)+Math.pow(p.lg-slg,2)) < 0.0015);
+            let m = window.rtis.find(p => Math.sqrt(Math.pow(p.lt-slt,2)+Math.pow(p.lg-slg,2)) < 0.0012);
             if(m) {
-                L.marker([slt, slg], {icon: L.icon({iconUrl: `master/icons/${sig.type}.png`, iconSize: [25, 25]})})
+                L.circleMarker([slt, slg], {radius: 6, color: sig.clr, fillOpacity: 0.9, fillColor: 'white', weight: 2})
                 .addTo(map).bindPopup(`<b>${getVal(sig,['SIGNAL_NAME'])}</b><br>Speed: ${m.spd} | Time: ${m.time}`);
             }
         });
 
-        let poly = L.polyline(window.rtis.map(p=>[p.lt,p.lg]), {color: '#333', weight: 4}).addTo(map);
+        let poly = L.polyline(window.rtis.map(p=>[p.lt,p.lg]), {color: 'black', weight: 3}).addTo(map);
         poly.on('mousemove', e => {
             let p = window.rtis.reduce((a, b) => Math.abs(b.lt-e.latlng.lat) < Math.abs(a.lt-e.latlng.lat) ? b : a);
             document.getElementById('live-speed').innerText = p.spd;
