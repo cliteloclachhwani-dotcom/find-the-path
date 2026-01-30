@@ -1,48 +1,33 @@
-// Function to generate the Excel/CSV Audit Report
 window.downloadExcelAudit = function() {
     if (!window.rtis || window.rtis.length === 0) return alert("Pehle Step 1: Map Generate karein!");
     
     const stnF = document.getElementById('s_from').value;
     const stnT = document.getElementById('s_to').value;
-    const dir = determineDirection(stnF, stnT); // Uses logic from mapping.js
+    const dir = determineDirection(stnF, stnT);
 
     let csv = `Audit Report: ${stnF} to ${stnT} (${dir} Movement)\n`;
-    csv += "Asset Type,Signal Name,Crossing Speed (Kmph),Crossing Time\n";
+    csv += "Type,Signal Name,Crossing Speed (Kmph),Time\n";
 
     let auditLog = [];
-
-    // Filter signals based on direction and matching RTIS slice
     window.master.sigs.forEach(sig => {
         if (!sig.type.startsWith(dir)) return;
-
-        let sLt = conv(getVal(sig, ['Lat']));
-        let sLg = conv(getVal(sig, ['Lng']));
-        let name = getVal(sig, ['SIGNAL_NAME']);
-
-        // Check proximity within the sliced RTIS data
-        let match = window.rtis.filter(p => 
-            Math.sqrt(Math.pow(p.lt - sLt, 2) + Math.pow(p.lg - sLg, 2)) < 0.002
-        );
+        let sLt = conv(getVal(sig, ['Lat'])), sLg = conv(getVal(sig, ['Lng']));
+        let match = window.rtis.filter(p => Math.sqrt(Math.pow(p.lt-sLt,2)+Math.pow(p.lg-sLg,2)) < 0.002);
 
         if (match.length > 0) {
-            // Find the point of closest approach
-            match.sort((a, b) => 
-                Math.sqrt(Math.pow(a.lt - sLt, 2) + Math.pow(a.lg - sLg, 2)) - 
-                Math.sqrt(Math.pow(b.lt - sLt, 2) + Math.pow(b.lg - sLg, 2))
-            );
-
+            match.sort((a,b) => Math.sqrt(Math.pow(a.lt-sLt,2)+Math.pow(a.lg-sLg,2)) - Math.sqrt(Math.pow(b.lt-sLt,2)+Math.pow(b.lg-sLg,2)));
             auditLog.push({
-                name: name,
+                type: sig.type,
+                name: getVal(sig, ['SIGNAL_NAME']),
                 spd: match[0].spd.toFixed(1),
                 time: getVal(match[0].raw, ['Time', 'Logging Time']) || "N/A",
-                index: window.rtis.indexOf(match[0])
+                idx: window.rtis.indexOf(match[0])
             });
         }
     });
 
-    // Sort by sequence of travel (RTIS index)
-    auditLog.sort((a, b) => a.index - b.index).forEach(r => {
-        csv += `SIGNAL,${r.name},${r.spd},${r.time}\n`;
+    auditLog.sort((a, b) => a.idx - b.idx).forEach(r => {
+        csv += `${r.type},${r.name},${r.spd},${r.time}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -53,10 +38,8 @@ window.downloadExcelAudit = function() {
     a.click();
 };
 
-// Function to generate the Interactive Web Report
 window.saveInteractiveWebReport = function() {
     if (!window.rtis || window.rtis.length === 0) return alert("Pehle Step 1: Map Generate karein!");
-
     const stnF = document.getElementById('s_from').value;
     const stnT = document.getElementById('s_to').value;
     const dir = determineDirection(stnF, stnT);
@@ -64,66 +47,69 @@ window.saveInteractiveWebReport = function() {
     let reportData = [];
     window.master.sigs.forEach(sig => {
         if (!sig.type.startsWith(dir)) return;
-        let sLt = conv(getVal(sig, ['Lat']));
-        let sLg = conv(getVal(sig, ['Lng']));
-        
-        let match = window.rtis.filter(p => Math.sqrt(Math.pow(p.lt - sLt, 2) + Math.pow(p.lg - sLg, 2)) < 0.002);
+        let sLt = conv(getVal(sig, ['Lat'])), sLg = conv(getVal(sig, ['Lng']));
+        let match = window.rtis.filter(p => Math.sqrt(Math.pow(p.lt-sLt,2)+Math.pow(p.lg-sLg,2)) < 0.002);
         if (match.length > 0) {
-            match.sort((a, b) => Math.sqrt(Math.pow(a.lt - sLt, 2) + Math.pow(a.lg - sLg, 2)) - Math.sqrt(Math.pow(b.lt - sLt, 2) + Math.pow(b.lg - sLg, 2)));
-            reportData.push({
-                n: getVal(sig, ['SIGNAL_NAME']),
-                s: match[0].spd.toFixed(1),
-                t: getVal(match[0].raw, ['Time', 'Logging Time']) || "N/A",
-                lt: sLt,
-                lg: sLg,
-                idx: window.rtis.indexOf(match[0])
+            match.sort((a,b) => Math.sqrt(Math.pow(a.lt-sLt,2)+Math.pow(a.lg-sLg,2)) - Math.sqrt(Math.pow(b.lt-sLt,2)+Math.pow(b.lg-sLg,2)));
+            reportData.push({ 
+                n: getVal(sig,['SIGNAL_NAME']), 
+                s: match[0].spd.toFixed(1), 
+                t: getVal(match[0].raw,['Time','Logging Time'])||"N/A", 
+                lt: sLt, lg: sLg, 
+                clr: sig.clr, 
+                type: sig.type,
+                idx: window.rtis.indexOf(match[0]) 
             });
         }
     });
-
     reportData.sort((a, b) => a.idx - b.idx);
 
-    // Build the standalone HTML Report
+    // Sidebar cards with color coding
     let listItems = reportData.map(r => `
-        <div class="card" onclick="m.setView([${r.lt}, ${r.lg}], 16)">
+        <div class="card" onclick="m.setView([${r.lt}, ${r.lg}], 16)" style="border-left: 6px solid ${r.clr};">
+            <div style="font-size:10px; color:${r.clr}; font-weight:bold;">${r.type}</div>
             <div class="sig-name">${r.n}</div>
-            <div class="sig-data">Speed: <b>${r.s} Kmph</b> | Time: ${r.t}</div>
+            <div class="sig-data">Speed: <b style="color:#fff;">${r.s} Kmph</b> | Time: ${r.t}</div>
         </div>
     `).join('');
 
     let htmlContent = `
-    <!DOCTYPE html>
     <html>
     <head>
-        <title>Audit: ${stnF}-${stnT}</title>
+        <title>Report: ${stnF}-${stnT}</title>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
-            body { margin:0; display:flex; font-family:sans-serif; height:100vh; background:#f4f4f4; }
-            #side { width:350px; overflow-y:auto; padding:20px; background:#002f6c; color:white; }
+            body { margin:0; display:flex; font-family:sans-serif; height:100vh; background:#000; }
+            #side { width:360px; overflow-y:auto; padding:15px; background:#1a1a1a; color:white; border-right:1px solid #333; }
             #map { flex:1; }
-            .card { background:rgba(255,255,255,0.1); padding:12px; margin-bottom:10px; border-radius:5px; cursor:pointer; border-left:5px solid #ffc107; transition: 0.2s; }
-            .card:hover { background:rgba(255,255,255,0.2); }
-            .sig-name { font-weight:bold; font-size:14px; margin-bottom:4px; }
-            .sig-data { font-size:12px; color:#ccc; }
+            .card { background:#2a2a2a; padding:10px; margin-bottom:8px; border-radius:4px; cursor:pointer; transition:0.2s; }
+            .card:hover { background:#333; }
+            .sig-name { font-weight:bold; font-size:13px; margin:3px 0; }
+            .sig-data { font-size:11px; color:#aaa; }
+            hr { border:0; border-top:1px solid #444; margin:15px 0; }
         </style>
     </head>
     <body>
         <div id="side">
-            <h2>${stnF} → ${stnT}</h2>
-            <p>Direction: ${dir} | Signals: ${reportData.length}</p>
-            <hr>${listItems}
+            <h3 style="margin:0; color:#ffc107;">${stnF} &#8594; ${stnT}</h3>
+            <p style="font-size:12px; color:#888;">Direction: ${dir} | Sliced Points: ${window.rtis.length}</p>
+            <hr>
+            ${listItems}
         </div>
         <div id="map"></div>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
-            var m = L.map('map').setView([${reportData[0]?.lt || 21}, ${reportData[0]?.lg || 81}], 13);
+            var m = L.map('map').setView([${reportData[0].lt},${reportData[0].lg}], 14);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
-            var path = ${JSON.stringify(window.rtis.map(p => [p.lt, p.lg]))};
-            var poly = L.polyline(path, {color:'black', weight:3}).addTo(m);
+            
+            var pathData = ${JSON.stringify(window.rtis.map(p=>[p.lt,p.lg]))};
+            var poly = L.polyline(pathData, {color:'#ffea00', weight:3, opacity:0.6}).addTo(m);
             m.fitBounds(poly.getBounds());
-            var sigs = ${JSON.stringify(reportData)};
-            sigs.forEach(s => {
-                L.circleMarker([s.lt, s.lg], {radius:6, color:'blue', fillOpacity:0.8}).addTo(m).bindPopup("<b>"+s.n+"</b><br>Speed: "+s.s+" Kmph");
+
+            var signals = ${JSON.stringify(reportData)};
+            signals.forEach(s => {
+                L.circleMarker([s.lt, s.lg], {radius:7, color:s.clr, fillOpacity:0.9, weight:2, fillColor:'white'}).addTo(m)
+                .bindPopup("<b>"+s.n+"</b><br>Speed: "+s.s+" Kmph");
             });
         </script>
     </body>
