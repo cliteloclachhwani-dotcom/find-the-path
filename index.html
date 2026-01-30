@@ -1,37 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Railway Audit Tool v3.0</title>
+    <title>Railway Audit Tool v3.0 Final</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; display: flex; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; height: 100vh; background: #f4f4f4; }
-        #sidebar { width: 320px; background: #2c3e50; color: white; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.3); z-index: 1000; overflow-y: auto; }
+        body { margin: 0; display: flex; font-family: 'Segoe UI', Arial, sans-serif; height: 100vh; background: #f4f4f4; }
+        #sidebar { width: 330px; background: #2c3e50; color: white; padding: 20px; z-index: 1000; overflow-y: auto; box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
         #map { flex: 1; position: relative; }
-        .stats-box { background: rgba(0,0,0,0.8); color: #00ff00; padding: 10px; border-radius: 5px; position: absolute; top: 10px; right: 10px; z-index: 1000; font-family: monospace; pointer-events: none; border: 1px solid #444; }
-        select, input, button { width: 100%; margin-bottom: 15px; padding: 10px; border-radius: 4px; border: none; }
-        button { background: #e67e22; color: white; font-weight: bold; cursor: pointer; }
+        .stats-box { background: rgba(0,0,0,0.85); color: #00ff00; padding: 12px; border-radius: 6px; position: absolute; top: 15px; right: 15px; z-index: 1000; font-family: 'Courier New', monospace; border: 1px solid #555; line-height: 1.5; }
+        select, input, button { width: 100%; margin-bottom: 15px; padding: 12px; border-radius: 4px; border: none; box-sizing: border-box; }
+        button { background: #e67e22; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
         button:hover { background: #d35400; }
-        .stn-label { background: transparent; border: none; }
-        .stn-text { color: black; font-weight: 900; font-size: 13px; text-transform: uppercase; text-shadow: 2px 2px white; white-space: nowrap; }
+        .stn-text { color: black; font-weight: 900; font-size: 14px; text-transform: uppercase; text-shadow: 2px 2px white; white-space: nowrap; }
     </style>
 </head>
 <body>
     <div id="sidebar">
-        <h2>Audit Control</h2>
-        <label>RTIS CSV File:</label>
+        <h2 style="color: #e67e22; border-bottom: 2px solid #34495e; padding-bottom: 10px;">Audit Control</h2>
+        <label>RTIS Data (CSV):</label>
         <input type="file" id="csv_file" accept=".csv">
         <label>From Station:</label>
         <select id="s_from"></select>
         <label>To Station:</label>
         <select id="s_to"></select>
-        <button onclick="generateLiveMap()">GENERATE MAP</button>
-        <hr>
-        <button style="background: #27ae60;" onclick="saveInteractiveWebReport()">SAVE WEB REPORT</button>
-        <button style="background: #2980b9;" onclick="downloadExcelAudit()">DOWNLOAD EXCEL</button>
-        <div id="log" style="font-size: 11px; margin-top: 10px; color: #bdc3c7;"></div>
+        <button onclick="generateLiveMap()">1. GENERATE FULL MAP</button>
+        <hr style="border: 0; border-top: 1px solid #444; margin: 20px 0;">
+        <button style="background: #27ae60;" onclick="saveInteractiveWebReport()">2. SAVE WEB REPORT</button>
+        <button style="background: #2980b9;" onclick="downloadExcelAudit()">3. DOWNLOAD EXCEL</button>
+        <div id="log" style="font-size: 12px; color: #bdc3c7; margin-top: 10px;"></div>
     </div>
     <div id="map">
         <div class="stats-box">
+            <b>LIVE MONITOR</b><br>
             SPEED: <span id="live-speed">0.0</span> Kmph<br>
             TIME: <span id="live-time">--:--:--</span>
         </div>
