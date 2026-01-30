@@ -4,29 +4,48 @@
     <title>SECR MONITOR</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; display: flex; font-family: sans-serif; height: 100vh; background: #eef2f3; }
-        #sidebar { width: 320px; background: #ffffff; color: #333; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); overflow-y: auto; }
+        body { margin: 0; display: flex; font-family: 'Segoe UI', Tahoma, sans-serif; height: 100vh; background: #f0f2f5; }
+        #sidebar { width: 320px; background: #343a40; color: #ffffff; padding: 25px; box-shadow: 2px 0 10px rgba(0,0,0,0.2); z-index: 1000; overflow-y: auto; }
         #map { flex: 1; position: relative; }
-        .stats-box { background: white; color: #333; padding: 10px; border-radius: 4px; position: absolute; top: 10px; right: 10px; z-index: 1000; font-family: monospace; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        select, input, button { width: 100%; margin-bottom: 12px; padding: 10px; border-radius: 4px; border: 1px solid #ccc; }
-        button { background: #34495e; color: white; cursor: pointer; font-weight: bold; border: none; }
-        button:hover { background: #2c3e50; }
-        h2 { color: #2c3e50; font-size: 18px; border-bottom: 2px solid #34495e; padding-bottom: 5px; }
+        .stats-box { background: white; color: #333; padding: 12px; border-radius: 4px; position: absolute; top: 15px; right: 15px; z-index: 1000; font-family: monospace; border: 1px solid #ccc; font-weight: bold; }
+        
+        h2 { font-size: 18px; margin-bottom: 25px; border-bottom: 1px solid #555; padding-bottom: 10px; white-space: nowrap; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 14px; color: #ddd; }
+        
+        select, input, button { width: 100%; margin-bottom: 20px; padding: 12px; border-radius: 5px; border: 1px solid #444; font-size: 14px; font-weight: bold; }
+        
+        /* File Input Green on Change */
+        input[type="file"].loaded { background-color: #27ae60 !important; color: white; border-color: #2ecc71; }
+        
+        select { background: #fff; cursor: pointer; }
+        button { background: #4b6584; color: white; border: none; cursor: pointer; text-transform: uppercase; transition: 0.3s; }
+        button:hover { background: #2f3640; }
+        
+        .stn-label-style { color: black; font-weight: 800; font-size: 13px; text-transform: uppercase; text-shadow: 1px 1px 2px white; white-space: nowrap; }
     </style>
 </head>
 <body>
     <div id="sidebar">
-        <h2>SECR RAIPUR TELOC CELL MONITOR</h2>
-        <input type="file" id="csv_file" accept=".csv">
-        <label>From:</label><select id="s_from"></select>
-        <label>To:</label><select id="s_to"></select>
-        <button onclick="generateLiveMap()">GENERATE MAP</button>
-        <button style="background: #27ae60;" onclick="saveInteractiveWebReport()">WEB REPORT</button>
-        <button style="background: #2980b9;" onclick="downloadExcelAudit()">EXCEL DOWNLOAD</button>
+        <h2>SECR RAIPUR TELOC CELL</h2>
+        <label>Upload RTIS Data:</label>
+        <input type="file" id="csv_file" accept=".csv" onchange="this.classList.add('loaded')">
+        
+        <label>From Station:</label>
+        <select id="s_from"></select>
+        
+        <label>To Station:</label>
+        <select id="s_to"></select>
+        
+        <button onclick="generateLiveMap()">Generate Map</button>
+        <button style="background: #218c74;" onclick="saveInteractiveWebReport()">Web Report</button>
+        <button style="background: #2d98da;" onclick="downloadExcelAudit()">Excel Download</button>
     </div>
     <div id="map">
-        <div class="stats-box">SPEED: <span id="live-speed">0.0</span> | TIME: <span id="live-time">--</span></div>
+        <div class="stats-box">
+            SPD: <span id="live-speed">0.0</span> kmph | TIME: <span id="live-time">--:--</span>
+        </div>
     </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script src="mapping.js"></script>
